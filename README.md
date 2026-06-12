@@ -148,4 +148,3 @@ Please include **clear setup instructions** in your README.
 # Copyright
 
 All trademarks remain the property of their respective owners.
-# test-26
