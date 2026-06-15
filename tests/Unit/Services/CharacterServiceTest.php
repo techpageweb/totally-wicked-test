@@ -6,7 +6,7 @@ use App\Services\RickAndMortyService;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
-class RickAndMortyServiceTest extends TestCase
+class CharacterServiceTest extends TestCase
 {
     private RickAndMortyService $service;
 
@@ -91,6 +91,45 @@ class RickAndMortyServiceTest extends TestCase
         $this->service->getCharacter(1);
 
         Http::assertSentCount(1);
+    }
+
+    // --- getMultipleEpisodes ---
+
+    public function test_get_multiple_episodes_returns_array_for_multiple_ids(): void
+    {
+        Http::fake([
+            '*/episode/1,2,3' => Http::response([
+                ['id' => 1, 'name' => 'Pilot', 'episode' => 'S01E01'],
+                ['id' => 2, 'name' => 'Lawnmower Dog', 'episode' => 'S01E02'],
+                ['id' => 3, 'name' => 'Anatomy Park', 'episode' => 'S01E03'],
+            ]),
+        ]);
+
+        $result = $this->service->getMultipleEpisodes([1, 2, 3]);
+
+        $this->assertCount(3, $result);
+        $this->assertEquals('Pilot', $result[0]['name']);
+    }
+
+    public function test_get_multiple_episodes_wraps_single_result_in_array(): void
+    {
+        Http::fake([
+            '*/episode/1' => Http::response(['id' => 1, 'name' => 'Pilot', 'episode' => 'S01E01']),
+        ]);
+
+        $result = $this->service->getMultipleEpisodes([1]);
+
+        $this->assertIsArray($result);
+        $this->assertCount(1, $result);
+        $this->assertEquals('Pilot', $result[0]['name']);
+    }
+
+    public function test_get_multiple_episodes_returns_empty_array_for_no_ids(): void
+    {
+        $result = $this->service->getMultipleEpisodes([]);
+
+        $this->assertEmpty($result);
+        Http::assertNothingSent();
     }
 
     // --- error handling ---
