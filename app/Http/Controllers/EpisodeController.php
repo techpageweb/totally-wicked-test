@@ -2,7 +2,9 @@
 
 namespace App\Http\Controllers;
 
+use App\Exceptions\ApiConnectionException;
 use App\Exceptions\ApiRateLimitException;
+use App\Http\Requests\SearchEpisodesRequest;
 use App\Services\RickAndMortyService;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -20,10 +22,10 @@ class EpisodeController extends Controller
     /**
      * Display a paginated, filterable list of episodes.
      *
-     * @param  Request  $request  Supported query params: search, episode, page
+     * @param  SearchEpisodesRequest  $request  Supported query params: search, episode, page
      * @return View
      */
-    public function index(Request $request): View
+    public function index(SearchEpisodesRequest $request): View
     {
         $filters = [
             'search'  => $request->string('search')->toString(),
@@ -32,6 +34,8 @@ class EpisodeController extends Controller
 
         $currentPage = max(1, $request->integer('page', 1));
 
+        $error = null;
+
         try {
             $data = $this->api->getEpisodes(array_filter([
                 'page'    => $currentPage,
@@ -39,13 +43,16 @@ class EpisodeController extends Controller
                 'episode' => $filters['episode'],
             ]));
 
-            $episodes    = $data['results'] ?? [];
-            $info        = $data['info'] ?? [];
-            $rateLimited = false;
+            $episodes = $data['results'] ?? [];
+            $info     = $data['info'] ?? [];
         } catch (ApiRateLimitException) {
-            $episodes    = [];
-            $info        = [];
-            $rateLimited = true;
+            $episodes = [];
+            $info     = [];
+            $error    = 'The API rate limit has been reached. Please wait a moment and try again.';
+        } catch (ApiConnectionException) {
+            $episodes = [];
+            $info     = [];
+            $error    = 'Unable to reach the Rick and Morty API. Please try again later.';
         }
 
         $filterQuery = http_build_query(array_filter($filters));
@@ -57,7 +64,7 @@ class EpisodeController extends Controller
                 'info'        => $info,
                 'filters'     => $filters,
                 'filterQuery' => $filterQuery,
-                'rateLimited' => $rateLimited,
+                'error'       => $error,
             ]
         ));
     }
@@ -72,19 +79,25 @@ class EpisodeController extends Controller
      */
     public function show(int $id, Request $request): View
     {
-        $episode = $this->api->getEpisode($id);
+        try {
+            $episode = $this->api->getEpisode($id);
 
-        if (empty($episode)) {
-            abort(404);
+            if (empty($episode)) {
+                abort(404);
+            }
+
+            $perPage     = 20;
+            $currentPage = max(1, $request->integer('page', 1));
+            $allIds      = array_map(fn ($url) => (int) basename($url), $episode['characters'] ?? []);
+            $totalPages  = max(1, (int) ceil(count($allIds) / $perPage));
+            $currentPage = min($currentPage, $totalPages);
+            $pageIds     = array_slice($allIds, ($currentPage - 1) * $perPage, $perPage);
+            $characters  = $this->api->getMultipleCharacters($pageIds);
+        } catch (ApiRateLimitException) {
+            abort(503, 'The API rate limit has been reached. Please try again in a moment.');
+        } catch (ApiConnectionException) {
+            abort(503, 'Unable to reach the Rick and Morty API. Please try again later.');
         }
-
-        $perPage     = 20;
-        $currentPage = max(1, $request->integer('page', 1));
-        $allIds      = array_map(fn ($url) => (int) basename($url), $episode['characters'] ?? []);
-        $totalPages  = max(1, (int) ceil(count($allIds) / $perPage));
-        $currentPage = min($currentPage, $totalPages);
-        $pageIds     = array_slice($allIds, ($currentPage - 1) * $perPage, $perPage);
-        $characters  = $this->api->getMultipleCharacters($pageIds);
 
         return view('episodes.show', array_merge(
             $this->paginationData($currentPage, $totalPages),

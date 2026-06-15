@@ -12,16 +12,22 @@
             <p class="text-zinc-400 text-lg max-w-xl mx-auto mb-8">
                 Search and explore information from the world of Rick and Morty
             </p>
-            <form action="{{ url('/characters') }}" method="GET" class="flex gap-2 max-w-lg mx-auto">
-                <input
-                    type="search"
-                    name="search"
-                    placeholder="Search characters…"
-                    class="flex-1 px-4 py-2.5 rounded bg-zinc-800 text-zinc-100 placeholder-zinc-500 border border-zinc-700 focus:outline-none focus:border-green-500 focus:ring-1 focus:ring-green-500"
-                >
-                <button type="submit" class="bg-green-500 hover:bg-green-400 text-zinc-900 font-semibold px-5 py-2.5 rounded transition-colors shadow shadow-green-500/20">
-                    Search
-                </button>
+            <form action="{{ url('/characters') }}" method="GET" class="flex flex-col gap-2 max-w-lg mx-auto">
+                <div class="flex gap-2">
+                    <input
+                        type="search"
+                        name="search"
+                        value="{{ old('search') }}"
+                        placeholder="Search characters…"
+                        class="flex-1 px-4 py-2.5 rounded bg-zinc-800 text-zinc-100 placeholder-zinc-500 border focus:outline-none focus:ring-1 transition-colors {{ $errors->has('search') ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : 'border-zinc-700 focus:border-green-500 focus:ring-green-500' }}"
+                    >
+                    <button type="submit" class="bg-green-500 hover:bg-green-400 text-zinc-900 font-semibold px-5 py-2.5 rounded transition-colors shadow shadow-green-500/20">
+                        Search
+                    </button>
+                </div>
+                @error('search')
+                    <p class="text-sm text-red-400 text-left">{{ $message }}</p>
+                @enderror
             </form>
         </div>
     </div>

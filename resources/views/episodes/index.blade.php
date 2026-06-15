@@ -4,38 +4,47 @@
 
 @section('content')
 
-    <x-rate-limit-error :rateLimited="$rateLimited" />
+    <x-rate-limit-error :message="$error" />
 
     {{-- Header & Search --}}
     <div class="mb-8">
         <h1 class="text-2xl font-bold text-zinc-100 mb-6">Episodes</h1>
 
-        <form method="GET" action="{{ url('/episodes') }}" class="flex flex-col sm:flex-row gap-3">
-            <input
-                type="search"
-                name="search"
-                value="{{ $filters['search'] }}"
-                placeholder="Search by name…"
-                class="flex-1 px-4 py-2 rounded bg-zinc-800 text-zinc-100 placeholder-zinc-500 border border-zinc-700 focus:outline-none focus:border-green-500 focus:ring-1 focus:ring-green-500"
-            >
+        <form method="GET" action="{{ url('/episodes') }}" class="flex flex-col gap-3">
+            <div class="flex flex-col sm:flex-row gap-3">
+                <input
+                    type="search"
+                    name="search"
+                    value="{{ old('search', $filters['search']) }}"
+                    placeholder="Search by name…"
+                    class="flex-1 px-4 py-2 rounded bg-zinc-800 text-zinc-100 placeholder-zinc-500 border focus:outline-none focus:ring-1 focus:ring-green-500 transition-colors {{ $errors->has('search') ? 'border-red-500 focus:border-red-500' : 'border-zinc-700 focus:border-green-500' }}"
+                >
 
-            <input
-                type="search"
-                name="episode"
-                value="{{ $filters['episode'] }}"
-                placeholder="Episode code, e.g. S01E01…"
-                class="flex-1 px-4 py-2 rounded bg-zinc-800 text-zinc-100 placeholder-zinc-500 border border-zinc-700 focus:outline-none focus:border-green-500 focus:ring-1 focus:ring-green-500"
-            >
+                <input
+                    type="search"
+                    name="episode"
+                    value="{{ old('episode', $filters['episode']) }}"
+                    placeholder="Episode code, e.g. S01E01…"
+                    class="flex-1 px-4 py-2 rounded bg-zinc-800 text-zinc-100 placeholder-zinc-500 border focus:outline-none focus:ring-1 focus:ring-green-500 transition-colors {{ $errors->has('episode') ? 'border-red-500 focus:border-red-500' : 'border-zinc-700 focus:border-green-500' }}"
+                >
 
-            <button type="submit" class="px-5 py-2 bg-green-500 hover:bg-green-400 text-zinc-900 font-semibold rounded transition-colors">
-                Filter
-            </button>
+                <button type="submit" class="px-5 py-2 bg-green-500 hover:bg-green-400 text-zinc-900 font-semibold rounded transition-colors">
+                    Filter
+                </button>
 
-            @if (array_filter($filters))
-                <a href="{{ url('/episodes') }}" class="px-5 py-2 bg-zinc-700 hover:bg-zinc-600 text-zinc-200 rounded transition-colors text-center">
-                    Clear
-                </a>
-            @endif
+                @if (array_filter($filters))
+                    <a href="{{ url('/episodes') }}" class="px-5 py-2 bg-zinc-700 hover:bg-zinc-600 text-zinc-200 rounded transition-colors text-center">
+                        Clear
+                    </a>
+                @endif
+            </div>
+
+            @error('search')
+                <p class="text-xs text-red-400">{{ $message }}</p>
+            @enderror
+            @error('episode')
+                <p class="text-xs text-red-400">{{ $message }}</p>
+            @enderror
         </form>
     </div>
 

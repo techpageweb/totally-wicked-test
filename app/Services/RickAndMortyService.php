@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Exceptions\ApiConnectionException;
 use App\Exceptions\ApiRateLimitException;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Cache;
@@ -11,8 +12,9 @@ use Illuminate\Support\Facades\Log;
 /**
  * Handles all communication with the Rick and Morty REST API.
  *
- * All responses are cached to reduce API calls and guard against rate limiting.
- * Returns an empty array on any failure so callers don't need to handle exceptions.
+ * Responses are cached to reduce API calls and guard against rate limiting.
+ * Throws ApiRateLimitException on HTTP 429 and ApiConnectionException on
+ * network failures or other non-success responses.
  */
 class RickAndMortyService
 {
@@ -82,8 +84,8 @@ class RickAndMortyService
                 $totalPages = $data['info']['pages'] ?? 1;
                 $page++;
             } while ($page <= $totalPages);
-        } catch (ApiRateLimitException) {
-            Log::warning('Rick and Morty API rate limit hit while building character filter options.');
+        } catch (ApiRateLimitException|ApiConnectionException) {
+            Log::warning('Rick and Morty API unavailable while building character filter options.');
         }
 
         foreach ($options as &$values) {
@@ -263,8 +265,8 @@ class RickAndMortyService
                 $totalPages = $data['info']['pages'] ?? 1;
                 $page++;
             } while ($page <= $totalPages);
-        } catch (ApiRateLimitException) {
-            Log::warning('Rick and Morty API rate limit hit while building location filter options.');
+        } catch (ApiRateLimitException|ApiConnectionException) {
+            Log::warning('Rick and Morty API unavailable while building location filter options.');
         }
 
         foreach ($options as &$values) {
@@ -283,8 +285,9 @@ class RickAndMortyService
      *
      * @param  string  $endpoint  Path relative to the base URL, e.g. '/character'.
      * @param  array   $params    Query parameters to append to the request.
-     * @return array Decoded JSON response, or empty array on any non-429 failure.
-     * @throws ApiRateLimitException  When the API returns HTTP 429.
+     * @return array Decoded JSON response.
+     * @throws ApiRateLimitException    When the API returns HTTP 429.
+     * @throws ApiConnectionException   When the API is unreachable or returns a non-success response.
      */
     private function get(string $endpoint, array $params = []): array
     {
@@ -298,15 +301,13 @@ class RickAndMortyService
 
             if ($response->failed()) {
                 Log::warning("Rick and Morty API error: {$response->status()} for {$endpoint}");
-
-                return [];
+                throw new ApiConnectionException("API returned {$response->status()} for {$endpoint}");
             }
 
             return $response->json() ?? [];
         } catch (ConnectionException $e) {
             Log::error("Rick and Morty API connection failed: {$e->getMessage()}");
-
-            return [];
+            throw new ApiConnectionException("Could not connect to the Rick and Morty API: {$e->getMessage()}", 0, $e);
         }
     }
 
