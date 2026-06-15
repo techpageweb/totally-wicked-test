@@ -19,6 +19,7 @@ php artisan serve
 The app runs on SQLite by default — no database setup required.
 
 ## Running Tests
+Tests are created with the assistance of AI (Claude skill)
 
 ```bash
 # Run all tests

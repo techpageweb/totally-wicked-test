@@ -1,9 +1,17 @@
 <?php
 
 use App\Http\Controllers\CharacterController;
+use App\Http\Controllers\EpisodeController;
+use App\Http\Controllers\LocationController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', fn () => view('index'));
 
 Route::get('/characters', [CharacterController::class, 'index']);
 Route::get('/characters/{id}', [CharacterController::class, 'show'])->whereNumber('id');
+
+Route::get('/episodes', [EpisodeController::class, 'index']);
+Route::get('/episodes/{id}', [EpisodeController::class, 'show'])->whereNumber('id');
+
+Route::get('/locations', [LocationController::class, 'index']);
+Route::get('/locations/{id}', [LocationController::class, 'show'])->whereNumber('id');
