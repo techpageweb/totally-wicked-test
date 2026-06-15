@@ -64,12 +64,26 @@
 
                 <div class="bg-zinc-900 border border-zinc-800 rounded-lg p-4">
                     <p class="text-xs text-zinc-500 uppercase tracking-wide mb-1">Origin</p>
-                    <p class="text-zinc-100 font-medium">{{ $character['origin']['name'] }}</p>
+                    @php $originId = $character['origin']['url'] ? (int) basename($character['origin']['url']) : null; @endphp
+                    @if ($originId)
+                        <a href="{{ url('/locations/' . $originId) }}" class="text-zinc-100 font-medium hover:text-green-400 transition-colors">
+                            {{ $character['origin']['name'] }}
+                        </a>
+                    @else
+                        <p class="text-zinc-100 font-medium">{{ $character['origin']['name'] }}</p>
+                    @endif
                 </div>
 
                 <div class="bg-zinc-900 border border-zinc-800 rounded-lg p-4">
                     <p class="text-xs text-zinc-500 uppercase tracking-wide mb-1">Last Known Location</p>
-                    <p class="text-zinc-100 font-medium">{{ $character['location']['name'] }}</p>
+                    @php $locationId = $character['location']['url'] ? (int) basename($character['location']['url']) : null; @endphp
+                    @if ($locationId)
+                        <a href="{{ url('/locations/' . $locationId) }}" class="text-zinc-100 font-medium hover:text-green-400 transition-colors">
+                            {{ $character['location']['name'] }}
+                        </a>
+                    @else
+                        <p class="text-zinc-100 font-medium">{{ $character['location']['name'] }}</p>
+                    @endif
                 </div>
 
                 <div class="bg-zinc-900 border border-zinc-800 rounded-lg p-4">
@@ -84,10 +98,11 @@
                     <h2 class="text-lg font-semibold text-zinc-100 mb-3">Episode Appearances</h2>
                     <div class="space-y-2 max-h-80 overflow-y-auto pr-1">
                         @foreach ($episodes as $episode)
-                            <div class="flex items-center justify-between bg-zinc-900 border border-zinc-800 rounded-lg px-4 py-3">
-                                <span class="text-sm text-zinc-100">{{ $episode['name'] }}</span>
+                            <a href="{{ url('/episodes/' . $episode['id']) }}"
+                               class="flex items-center justify-between bg-zinc-900 border border-zinc-800 hover:border-green-500/50 rounded-lg px-4 py-3 transition-colors group">
+                                <span class="text-sm text-zinc-100 group-hover:text-green-400 transition-colors">{{ $episode['name'] }}</span>
                                 <span class="text-xs text-green-400 font-mono shrink-0 ml-4">{{ $episode['episode'] }}</span>
-                            </div>
+                            </a>
                         @endforeach
                     </div>
                 </div>

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Exceptions\ApiRateLimitException;
 use App\Services\RickAndMortyService;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -11,37 +12,70 @@ use Illuminate\View\View;
  */
 class LocationController extends Controller
 {
+    /**
+     * @param  RickAndMortyService  $api  Injected API service.
+     */
     public function __construct(private RickAndMortyService $api) {}
 
     /**
      * Display a paginated, filterable list of locations.
      *
      * @param  Request  $request  Supported query params: search, type, dimension, page
+     * @return View
      */
     public function index(Request $request): View
     {
-        $params = array_filter([
-            'page'      => $request->integer('page', 1),
-            'name'      => $request->string('search')->toString(),
+        $filters = [
+            'search'    => $request->string('search')->toString(),
             'type'      => $request->string('type')->toString(),
             'dimension' => $request->string('dimension')->toString(),
-        ]);
+        ];
 
-        $data = $this->api->getLocations($params);
+        $currentPage = max(1, $request->integer('page', 1));
 
-        return view('locations.index', [
-            'locations' => $data['results'] ?? [],
-            'info'      => $data['info'] ?? [],
-            'filters'   => $request->only(['search', 'type', 'dimension']),
-        ]);
+        try {
+            $data = $this->api->getLocations(array_filter([
+                'page'      => $currentPage,
+                'name'      => $filters['search'],
+                'type'      => $filters['type'],
+                'dimension' => $filters['dimension'],
+            ]));
+
+            $locations     = $data['results'] ?? [];
+            $info          = $data['info'] ?? [];
+            $filterOptions = $this->api->getLocationFilterOptions();
+            $rateLimited   = false;
+        } catch (ApiRateLimitException) {
+            $locations     = [];
+            $info          = [];
+            $filterOptions = [];
+            $rateLimited   = true;
+        }
+
+        $filterQuery = http_build_query(array_filter($filters));
+
+        return view('locations.index', array_merge(
+            $this->paginationData($currentPage, $info['pages'] ?? 1),
+            [
+                'locations'     => $locations,
+                'info'          => $info,
+                'filters'       => $filters,
+                'filterOptions' => $filterOptions,
+                'filterQuery'   => $filterQuery,
+                'rateLimited'   => $rateLimited,
+            ]
+        ));
     }
 
     /**
-     * Display a single location.
+     * Display a single location with a paginated list of its residents (20 per page).
      *
-     * Aborts with 404 if the location is not found in the API.
+     * @param  int      $id       Location ID.
+     * @param  Request  $request  Supports query param: page
+     * @return View
+     * @throws \Symfony\Component\HttpKernel\Exception\NotFoundHttpException
      */
-    public function show(int $id): View
+    public function show(int $id, Request $request): View
     {
         $location = $this->api->getLocation($id);
 
@@ -49,6 +83,17 @@ class LocationController extends Controller
             abort(404);
         }
 
-        return view('locations.show', compact('location'));
+        $perPage     = 20;
+        $currentPage = max(1, $request->integer('page', 1));
+        $allIds      = array_map(fn ($url) => (int) basename($url), $location['residents'] ?? []);
+        $totalPages  = max(1, (int) ceil(count($allIds) / $perPage));
+        $currentPage = min($currentPage, $totalPages);
+        $pageIds     = array_slice($allIds, ($currentPage - 1) * $perPage, $perPage);
+        $residents   = $this->api->getMultipleCharacters($pageIds);
+
+        return view('locations.show', array_merge(
+            $this->paginationData($currentPage, $totalPages),
+            compact('location', 'residents')
+        ));
     }
 }
