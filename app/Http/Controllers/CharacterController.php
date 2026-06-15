@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Exceptions\ApiRateLimitException;
 use App\Services\RickAndMortyService;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -20,20 +21,56 @@ class CharacterController extends Controller
      */
     public function index(Request $request): View
     {
-        $params = array_filter([
-            'page'    => $request->integer('page', 1),
-            'name'    => $request->string('search')->toString(),
+        $filters = [
+            'search'  => $request->string('search')->toString(),
             'status'  => $request->string('status')->toString(),
             'species' => $request->string('species')->toString(),
             'gender'  => $request->string('gender')->toString(),
-        ]);
+        ];
 
-        $data = $this->api->getCharacters($params);
+        $currentPage = max(1, $request->integer('page', 1));
+
+        try {
+            $data = $this->api->getCharacters(array_filter([
+                'page'    => $currentPage,
+                'name'    => $filters['search'],
+                'status'  => $filters['status'],
+                'species' => $filters['species'],
+                'gender'  => $filters['gender'],
+            ]));
+
+            $characters    = $data['results'] ?? [];
+            $info          = $data['info'] ?? [];
+            $filterOptions = $this->api->getCharacterFilterOptions();
+            $rateLimited   = false;
+        } catch (ApiRateLimitException) {
+            $characters    = [];
+            $info          = [];
+            $filterOptions = [];
+            $rateLimited   = true;
+        }
+
+        $totalPages  = $info['pages'] ?? 1;
+        $filterQuery = http_build_query(array_filter($filters));
+
+        $window      = 2;
+        $pageNumbers = [];
+        for ($i = 1; $i <= $totalPages; $i++) {
+            if ($i === 1 || $i === $totalPages || ($i >= $currentPage - $window && $i <= $currentPage + $window)) {
+                $pageNumbers[] = $i;
+            }
+        }
 
         return view('characters.index', [
-            'characters' => $data['results'] ?? [],
-            'info'       => $data['info'] ?? [],
-            'filters'    => $request->only(['search', 'status', 'species', 'gender']),
+            'characters'    => $characters,
+            'info'          => $info,
+            'filters'       => $filters,
+            'filterOptions' => $filterOptions,
+            'currentPage'   => $currentPage,
+            'totalPages'    => $totalPages,
+            'pageNumbers'   => $pageNumbers,
+            'filterQuery'   => $filterQuery,
+            'rateLimited'   => $rateLimited,
         ]);
     }
 

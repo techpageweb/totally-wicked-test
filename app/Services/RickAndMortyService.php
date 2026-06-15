@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Exceptions\ApiRateLimitException;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
@@ -19,10 +20,13 @@ class RickAndMortyService
 
     private int $cacheTtl;
 
+    private int $filterCacheTtl;
+
     public function __construct()
     {
-        $this->baseUrl = config('rickandmorty.base_url');
-        $this->cacheTtl = config('rickandmorty.cache_ttl');
+        $this->baseUrl       = config('rickandmorty.base_url');
+        $this->cacheTtl      = config('rickandmorty.cache_ttl');
+        $this->filterCacheTtl = config('rickandmorty.filter_cache_ttl');
     }
 
     /**
@@ -36,6 +40,55 @@ class RickAndMortyService
         $cacheKey = 'characters.' . md5(serialize($params));
 
         return $this->remember($cacheKey, fn () => $this->get('/character', $params));
+    }
+
+    /**
+     * Derive the unique filter values (status, gender, species) from all character pages.
+     *
+     * Uses a 24-hour cache TTL to avoid repeating the full page scan on every hour boundary.
+     * Catches rate limit errors mid-scan and caches whatever was collected so far.
+     *
+     * @return array{status: string[], gender: string[], species: string[]}
+     */
+    public function getCharacterFilterOptions(): array
+    {
+        $cached = Cache::get('characters.filter_options');
+        if ($cached !== null) {
+            return $cached;
+        }
+
+        $options = ['status' => [], 'gender' => [], 'species' => []];
+        $page = 1;
+
+        try {
+            do {
+                $data = $this->getCharacters(['page' => $page]);
+
+                foreach ($data['results'] ?? [] as $character) {
+                    foreach (array_keys($options) as $field) {
+                        $value = $character[$field] ?? '';
+                        if ($value !== '' && ! in_array($value, $options[$field], true)) {
+                            $options[$field][] = $value;
+                        }
+                    }
+                }
+
+                $totalPages = $data['info']['pages'] ?? 1;
+                $page++;
+            } while ($page <= $totalPages);
+        } catch (ApiRateLimitException) {
+            Log::warning('Rick and Morty API rate limit hit while building character filter options.');
+        }
+
+        foreach ($options as &$values) {
+            sort($values);
+        }
+
+        if (! empty(array_filter($options))) {
+            Cache::put('characters.filter_options', $options, $this->filterCacheTtl);
+        }
+
+        return $options;
     }
 
     /**
@@ -129,6 +182,10 @@ class RickAndMortyService
             $response = Http::timeout(10)
                 ->get($this->baseUrl . $endpoint, $params);
 
+            if ($response->status() === 429) {
+                throw new ApiRateLimitException("Rate limit reached for {$endpoint}");
+            }
+
             if ($response->failed()) {
                 Log::warning("Rick and Morty API error: {$response->status()} for {$endpoint}");
 
@@ -145,9 +202,20 @@ class RickAndMortyService
 
     /**
      * Retrieve a cached value or store the result of the callback.
+     * Empty arrays are never cached — they indicate a failed request and should be retried.
      */
     private function remember(string $key, callable $callback): array
     {
-        return Cache::remember($key, $this->cacheTtl, $callback);
+        if (($cached = Cache::get($key)) !== null) {
+            return $cached;
+        }
+
+        $result = $callback();
+
+        if (! empty($result)) {
+            Cache::put($key, $result, $this->cacheTtl);
+        }
+
+        return $result;
     }
 }

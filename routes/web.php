@@ -2,10 +2,13 @@
 
 use App\Http\Controllers\CharacterController;
 use App\Http\Controllers\EpisodeController;
+use App\Http\Controllers\ImageController;
 use App\Http\Controllers\LocationController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', fn () => view('index'));
+
+Route::get('/images/character/{id}', [ImageController::class, 'characterAvatar'])->whereNumber('id');
 
 Route::get('/characters', [CharacterController::class, 'index']);
 Route::get('/characters/{id}', [CharacterController::class, 'show'])->whereNumber('id');
