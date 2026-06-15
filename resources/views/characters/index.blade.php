@@ -4,13 +4,7 @@
 
 @section('content')
 
-    {{-- Rate limit error --}}
-    @if ($rateLimited)
-        <div class="mb-6 flex items-start gap-3 rounded-lg border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm text-red-400">
-            <span class="mt-0.5 shrink-0">&#9888;</span>
-            <span>The API rate limit has been reached. Please wait a moment and <a href="{{ request()->fullUrl() }}" class="underline hover:text-red-300">try again</a>.</span>
-        </div>
-    @endif
+    <x-rate-limit-error :rateLimited="$rateLimited" />
 
     {{-- Header & Search --}}
     <div class="mb-8">
@@ -20,28 +14,28 @@
             <input
                 type="search"
                 name="search"
-                value="{{ $filters['search'] ?? '' }}"
+                value="{{ $filters['search'] }}"
                 placeholder="Search by name…"
                 class="flex-1 px-4 py-2 rounded bg-zinc-800 text-zinc-100 placeholder-zinc-500 border border-zinc-700 focus:outline-none focus:border-green-500 focus:ring-1 focus:ring-green-500"
             >
 
             <select name="status" class="px-4 py-2 rounded bg-zinc-800 text-zinc-100 border border-zinc-700 focus:outline-none focus:border-green-500">
                 <option value="">All Statuses</option>
-                @foreach ($filterOptions['status'] as $option)
+                @foreach ($filterOptions['status'] ?? [] as $option)
                     <option value="{{ $option }}" @selected($filters['status'] === $option)>{{ $option }}</option>
                 @endforeach
             </select>
 
             <select name="gender" class="px-4 py-2 rounded bg-zinc-800 text-zinc-100 border border-zinc-700 focus:outline-none focus:border-green-500">
                 <option value="">All Genders</option>
-                @foreach ($filterOptions['gender'] as $option)
+                @foreach ($filterOptions['gender'] ?? [] as $option)
                     <option value="{{ $option }}" @selected($filters['gender'] === $option)>{{ $option }}</option>
                 @endforeach
             </select>
 
             <select name="species" class="px-4 py-2 rounded bg-zinc-800 text-zinc-100 border border-zinc-700 focus:outline-none focus:border-green-500">
                 <option value="">All Species</option>
-                @foreach ($filterOptions['species'] as $option)
+                @foreach ($filterOptions['species'] ?? [] as $option)
                     <option value="{{ $option }}" @selected($filters['species'] === $option)>{{ $option }}</option>
                 @endforeach
             </select>
@@ -60,9 +54,7 @@
 
     {{-- Results count --}}
     @if (!empty($info))
-        <p class="text-sm text-zinc-500 mb-6">
-            {{ number_format($info['count']) }} characters found
-        </p>
+        <p class="text-sm text-zinc-500 mb-6">{{ number_format($info['count']) }} characters found</p>
     @endif
 
     {{-- Character grid --}}
@@ -99,55 +91,13 @@
             @endforeach
         </div>
 
-        {{-- Pagination --}}
-        @if ($totalPages > 1)
-            @php
-                $pageUrl = fn($p) => url('/characters') . '?' . ($filterQuery ? $filterQuery . '&page=' . $p : 'page=' . $p);
-            @endphp
-
-            <div class="flex items-center justify-center gap-1 flex-wrap mt-2">
-
-                {{-- Previous --}}
-                @if ($currentPage > 1)
-                    <a href="{{ $pageUrl($currentPage - 1) }}"
-                       class="px-3 py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded transition-colors text-sm">
-                        &larr;
-                    </a>
-                @else
-                    <span class="px-3 py-2 bg-zinc-900 text-zinc-600 rounded text-sm cursor-default">&larr;</span>
-                @endif
-
-                {{-- Numbered pages with ellipsis --}}
-                @php $prev = null; @endphp
-                @foreach ($pageNumbers as $page)
-                    @if ($prev !== null && $page - $prev > 1)
-                        <span class="px-2 py-2 text-zinc-500 text-sm select-none">&hellip;</span>
-                    @endif
-
-                    @if ($page === $currentPage)
-                        <span class="px-3 py-2 bg-green-500 text-zinc-900 font-semibold rounded text-sm">{{ $page }}</span>
-                    @else
-                        <a href="{{ $pageUrl($page) }}"
-                           class="px-3 py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded transition-colors text-sm">
-                            {{ $page }}
-                        </a>
-                    @endif
-
-                    @php $prev = $page; @endphp
-                @endforeach
-
-                {{-- Next --}}
-                @if ($currentPage < $totalPages)
-                    <a href="{{ $pageUrl($currentPage + 1) }}"
-                       class="px-3 py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded transition-colors text-sm">
-                        &rarr;
-                    </a>
-                @else
-                    <span class="px-3 py-2 bg-zinc-900 text-zinc-600 rounded text-sm cursor-default">&rarr;</span>
-                @endif
-
-            </div>
-        @endif
+        <x-pagination
+            :currentPage="$currentPage"
+            :totalPages="$totalPages"
+            :pageNumbers="$pageNumbers"
+            :filterQuery="$filterQuery"
+            baseUrl="/characters"
+        />
 
     @else
         <div class="text-center py-20 text-zinc-500">

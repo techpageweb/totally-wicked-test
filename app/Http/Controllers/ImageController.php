@@ -15,6 +15,12 @@ use Illuminate\Support\Facades\Storage;
  */
 class ImageController extends Controller
 {
+    /**
+     * Serve a character avatar, fetching and caching it from the API on first request.
+     *
+     * @param  int  $id  Character ID.
+     * @return Response  JPEG image with a one-year immutable Cache-Control header.
+     */
     public function characterAvatar(int $id): Response
     {
         $path = "character-images/{$id}.jpeg";

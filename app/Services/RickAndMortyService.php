@@ -16,16 +16,22 @@ use Illuminate\Support\Facades\Log;
  */
 class RickAndMortyService
 {
+    /** @var string Base URL for all API requests. */
     private string $baseUrl;
 
+    /** @var int Cache TTL in seconds for individual API responses. */
     private int $cacheTtl;
 
+    /** @var int Cache TTL in seconds for derived filter option sets (longer than per-request cache). */
     private int $filterCacheTtl;
 
+    /**
+     * Reads API base URL and cache TTL values from application config.
+     */
     public function __construct()
     {
-        $this->baseUrl       = config('rickandmorty.base_url');
-        $this->cacheTtl      = config('rickandmorty.cache_ttl');
+        $this->baseUrl        = config('rickandmorty.base_url');
+        $this->cacheTtl       = config('rickandmorty.cache_ttl');
         $this->filterCacheTtl = config('rickandmorty.filter_cache_ttl');
     }
 
@@ -102,6 +108,58 @@ class RickAndMortyService
     }
 
     /**
+     * Get multiple characters by their IDs in a single request.
+     *
+     * The API returns a single object when one ID is given and an array for multiple,
+     * so the result is always normalised to an array of characters.
+     *
+     * @param  int[]  $ids
+     * @return array<int, array>
+     */
+    public function getMultipleCharacters(array $ids): array
+    {
+        if (empty($ids)) {
+            return [];
+        }
+
+        $cacheKey = 'characters.multi.' . md5(implode(',', $ids));
+
+        return $this->remember($cacheKey, function () use ($ids) {
+            $result = $this->get('/character/' . implode(',', $ids));
+
+            return isset($result['id']) ? [$result] : $result;
+        });
+    }
+
+    /**
+     * Get the total counts for characters, episodes, and locations.
+     *
+     * Fetches page 1 of each resource and reads the info.count field.
+     * Cached for 24 hours as these numbers change infrequently.
+     *
+     * @return array{characters: int|null, episodes: int|null, locations: int|null}
+     */
+    public function getStats(): array
+    {
+        $cached = Cache::get('stats.counts');
+        if ($cached !== null) {
+            return $cached;
+        }
+
+        $stats = [
+            'characters' => $this->get('/character', ['page' => 1])['info']['count'] ?? null,
+            'episodes'   => $this->get('/episode',   ['page' => 1])['info']['count'] ?? null,
+            'locations'  => $this->get('/location',  ['page' => 1])['info']['count'] ?? null,
+        ];
+
+        if (array_filter($stats, fn ($v) => $v !== null)) {
+            Cache::put('stats.counts', $stats, $this->filterCacheTtl);
+        }
+
+        return $stats;
+    }
+
+    /**
      * Get a paginated list of episodes.
      *
      * @param  array  $params  Supported filters: page, name, episode
@@ -172,9 +230,61 @@ class RickAndMortyService
     }
 
     /**
+     * Derive the unique filter values (type, dimension) from all location pages.
+     *
+     * Uses a 24-hour cache TTL. Catches rate limit errors mid-scan and caches
+     * whatever was collected so far.
+     *
+     * @return array{type: string[], dimension: string[]}
+     */
+    public function getLocationFilterOptions(): array
+    {
+        $cached = Cache::get('locations.filter_options');
+        if ($cached !== null) {
+            return $cached;
+        }
+
+        $options = ['type' => [], 'dimension' => []];
+        $page = 1;
+
+        try {
+            do {
+                $data = $this->getLocations(['page' => $page]);
+
+                foreach ($data['results'] ?? [] as $location) {
+                    foreach (array_keys($options) as $field) {
+                        $value = $location[$field] ?? '';
+                        if ($value !== '' && $value !== 'unknown' && ! in_array($value, $options[$field], true)) {
+                            $options[$field][] = $value;
+                        }
+                    }
+                }
+
+                $totalPages = $data['info']['pages'] ?? 1;
+                $page++;
+            } while ($page <= $totalPages);
+        } catch (ApiRateLimitException) {
+            Log::warning('Rick and Morty API rate limit hit while building location filter options.');
+        }
+
+        foreach ($options as &$values) {
+            sort($values);
+        }
+
+        if (! empty(array_filter($options))) {
+            Cache::put('locations.filter_options', $options, $this->filterCacheTtl);
+        }
+
+        return $options;
+    }
+
+    /**
      * Make a GET request to the API.
      *
-     * @return array Decoded JSON response, or empty array on failure.
+     * @param  string  $endpoint  Path relative to the base URL, e.g. '/character'.
+     * @param  array   $params    Query parameters to append to the request.
+     * @return array Decoded JSON response, or empty array on any non-429 failure.
+     * @throws ApiRateLimitException  When the API returns HTTP 429.
      */
     private function get(string $endpoint, array $params = []): array
     {

@@ -30,10 +30,16 @@
 @section('content')
 
     {{-- Stats --}}
-    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-12">
-        @foreach ([['826', 'Characters'], ['126', 'Locations'], ['51', 'Episodes'], ['3', 'Seasons']] as [$count, $label])
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-12">
+        @foreach ([
+            [$stats['characters'], 'Characters'],
+            [$stats['locations'],  'Locations'],
+            [$stats['episodes'],   'Episodes'],
+        ] as [$count, $label])
             <div class="bg-zinc-900 rounded-lg border border-zinc-800 p-5 text-center">
-                <div class="text-2xl font-bold text-green-400">{{ $count }}</div>
+                <div class="text-2xl font-bold text-green-400">
+                    {{ $count !== null ? number_format($count) : '—' }}
+                </div>
                 <div class="text-sm text-zinc-400 mt-1">{{ $label }}</div>
             </div>
         @endforeach

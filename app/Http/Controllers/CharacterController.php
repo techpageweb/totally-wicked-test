@@ -12,12 +12,16 @@ use Illuminate\View\View;
  */
 class CharacterController extends Controller
 {
+    /**
+     * @param  RickAndMortyService  $api  Injected API service.
+     */
     public function __construct(private RickAndMortyService $api) {}
 
     /**
      * Display a paginated, filterable list of characters.
      *
      * @param  Request  $request  Supported query params: search, status, species, gender, page
+     * @return View
      */
     public function index(Request $request): View
     {
@@ -50,34 +54,27 @@ class CharacterController extends Controller
             $rateLimited   = true;
         }
 
-        $totalPages  = $info['pages'] ?? 1;
         $filterQuery = http_build_query(array_filter($filters));
 
-        $window      = 2;
-        $pageNumbers = [];
-        for ($i = 1; $i <= $totalPages; $i++) {
-            if ($i === 1 || $i === $totalPages || ($i >= $currentPage - $window && $i <= $currentPage + $window)) {
-                $pageNumbers[] = $i;
-            }
-        }
-
-        return view('characters.index', [
-            'characters'    => $characters,
-            'info'          => $info,
-            'filters'       => $filters,
-            'filterOptions' => $filterOptions,
-            'currentPage'   => $currentPage,
-            'totalPages'    => $totalPages,
-            'pageNumbers'   => $pageNumbers,
-            'filterQuery'   => $filterQuery,
-            'rateLimited'   => $rateLimited,
-        ]);
+        return view('characters.index', array_merge(
+            $this->paginationData($currentPage, $info['pages'] ?? 1),
+            [
+                'characters'    => $characters,
+                'info'          => $info,
+                'filters'       => $filters,
+                'filterOptions' => $filterOptions,
+                'filterQuery'   => $filterQuery,
+                'rateLimited'   => $rateLimited,
+            ]
+        ));
     }
 
     /**
      * Display a single character with their episode appearances.
      *
-     * Aborts with 404 if the character is not found in the API.
+     * @param  int  $id  Character ID.
+     * @return View
+     * @throws \Symfony\Component\HttpKernel\Exception\NotFoundHttpException
      */
     public function show(int $id): View
     {

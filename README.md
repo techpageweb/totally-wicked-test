@@ -1,151 +1,228 @@
-# PHP Developer Technical Assessment  
-## Rick and Morty Encyclopedia
+# Rick and Morty Encyclopedia
 
-## Overview
+A web-based encyclopedia built on the [Rick and Morty REST API](https://rickandmortyapi.com). Browse characters, episodes, and locations with search, filtering, and pagination throughout.
 
-This exercise is intended to evaluate your ability to design and build a **small production-quality web application using modern PHP practices**.
-
-You will create a web-based encyclopedia using data from the Rick and Morty API.
-
-The emphasis of this assessment is on:
-
-- **Clean architecture and maintainable code**
-- **Proper MVC separation**
-- **Object-oriented PHP**
-- API integration
-- Security and resilience
-- Performance and usability
-- Thoughtful engineering decisions
-
-Visual design is considered a bonus, but **functionality, code quality, and implementation approach are the primary evaluation criteria**.
+Built with Laravel 13, Blade, and Tailwind CSS v4.
 
 ---
 
-# Technical Requirements
+## Requirements
 
-Your solution **must** use:
-
-- **PHP 8.3 or higher**
-- Composer
+- **PHP 8.3 or higher** (8.4 recommended) with the following extensions: `ext-curl`, `ext-mbstring`, `ext-xml`, `ext-sqlite3`
+- **Composer** 2.x
+- **Node.js** 18+ and **npm**
 - Git
 
-You may use any PHP framework, front-end framework, CSS library, or Composer packages you feel are appropriate.
-
-However:
-
-- **All communication with the Rick and Morty API must be implemented using your own application code**
-- You may use generic HTTP clients/libraries (such as Guzzle, Symfony HTTP Client, cURL wrappers, etc.)
-- **You must not use SDKs, wrappers, or dedicated libraries built specifically for the Rick and Morty API**
+If you are using [Laravel Herd](https://herd.laravel.com) on macOS or Windows it handles PHP and the required extensions for you.
 
 ---
 
-# Application Requirements
+## Installation
 
-Your application **must follow a clear MVC structure** and use **object-oriented PHP throughout**.
+```bash
+git clone https://github.com/techpageweb/totally-wicked-test
+cd totally-wicked-test
 
-The application should allow users to:
+composer install
 
-## Character Listing
+cp .env.example .env
+php artisan key:generate
 
-Display a browsable list of Rick and Morty characters with:
+npm install
+npm run build
+```
 
-- **Pagination**
-- **Search functionality**
-- **Filtering functionality**
+No database setup is required — the app uses SQLite by default and only uses the filesystem for the cache and image storage.
 
-The browsing experience should remain responsive and user-friendly when navigating larger datasets.
+### Storage permissions
 
----
+On Linux/macOS, make sure the storage directory is writable:
 
-## Character Details
+```bash
+chmod -R 775 storage bootstrap/cache
+```
 
-Display detailed information for an individual character, including at minimum:
-
-- At least one image
-- Name
-- Species
-- Origin
-- Episodes in which the character appears
-
----
-
-# API
-
-Use the public Rick and Morty REST API:
-
-Rick and Morty API: https://rickandmortyapi.com
-
-Authentication is not required.
-
-Please note that the API is rate-limited, and your implementation should account for this appropriately where reasonable.
+On Windows with Herd this is handled automatically.
 
 ---
 
-# Production Readiness
+## Running the App
 
-Your submission should be considered **production-ready**.
+```bash
+php artisan serve
+```
 
-Please consider:
+Then open [http://localhost:8000](http://localhost:8000).
 
-- Input validation and sanitization
-- Error handling
-- Secure coding practices
-- Protection against common attack vectors
-- Sensible application structure
-- Performance considerations
-- Maintainability and readability
-- Dependency management
-- Environment configuration
+For active frontend development with hot reloading, run Vite alongside the server:
 
-You are encouraged to document **architectural decisions, trade-offs, and notable implementation choices** made during development.
+```bash
+# Terminal 1
+php artisan serve
 
----
-
-# Candidate Authorship & Use of AI Tools
-
-This assessment is intended to evaluate **your own engineering ability and decision-making**.
-
-You may use developer assistance tools (including AI tools, documentation resources, code completion, and reference materials) as part of your workflow. However:
-
-- **The architecture, implementation, and final submission must be your own work**
-- **You must fully understand, review, and be able to explain all submitted code**
-- **Blindly generated, copy-pasted, or unreviewed AI output is not acceptable**
-- We may discuss implementation decisions, architecture, and specific areas of your code during follow-up conversations
-
-The goal is not to prohibit modern tooling, but to assess your **practical software engineering skills, judgment, and ownership of the submitted solution**.
+# Terminal 2
+npm run dev
+```
 
 ---
 
-# Time Expectation
+## Usage
 
-This assessment is intentionally scoped to be completed within approximately **2–3 hours**.
+| Page | URL | Description |
+|---|---|---|
+| Home | `/` | Landing page with navigation |
+| Characters | `/characters` | Browse all characters with search and filters |
+| Character detail | `/characters/{id}` | Full profile, stats, and episode appearances |
+| Episodes | `/episodes` | Browse all episodes, searchable by name or code |
+| Episode detail | `/episodes/{id}` | Episode info and paginated character list |
+| Locations | `/locations` | Browse all locations with type and dimension filters |
+| Location detail | `/locations/{id}` | Location info and paginated resident list |
 
-We are not expecting a fully featured enterprise platform. We are more interested in seeing your:
+### Filters
 
-- Engineering approach
-- Prioritization
-- Implementation quality
-- Understanding of the codebase
+- **Characters** — filter by status (Alive/Dead/unknown), gender, and species. All options are pulled from the API and cached for 24 hours, so the dropdowns always reflect the actual data.
+- **Locations** — filter by type and dimension, same approach.
+- **Episodes** — search by name or episode code (e.g. `S01E04`).
 
-…than an overly polished feature set.
+### API rate limiting
 
----
-
-# Submission
-
-To submit your solution:
-
-1. Fork this repository
-2. **Commit your work regularly as you progress**
-3. Submit a link to your completed fork
-
-Your application should be runnable locally from the repository without requiring additional setup beyond standard project installation steps.
-
-Please include **clear setup instructions** in your README.
+The app caches all API responses for 1 hour. If the API rate limit is hit before the cache is warm, a banner is shown on the affected page. Refresh after a moment and the cached data will serve the page without hitting the API again.
 
 ---
 
-# Copyright
+## Running Tests
 
-All trademarks remain the property of their respective owners.
-# test-26
+```bash
+# Run all tests
+php artisan test
+
+# Verbose output with test names
+php vendor/phpunit/phpunit/phpunit --testdox
+
+# Unit tests only
+php artisan test --testsuite=Unit
+
+# Single test file
+php artisan test tests/Unit/Services/CharactersServiceTest.php
+```
+
+Tests cover the `RickAndMortyService` for characters, episodes, and locations using `Http::fake()` — no real API calls are made.
+
+---
+
+## Common Issues
+
+**Blank page with no styles**
+
+The frontend assets haven't been built. Run `npm run build` and reload.
+
+---
+
+**`Class "App\Http\Controllers\..." not found` or similar autoload errors**
+
+Regenerate the Composer autoloader:
+
+```bash
+composer dump-autoload
+```
+
+---
+
+**Wrong PHP version (`php -v` shows 7.x or 8.0/8.1)**
+
+Your system PHP is taking priority over Herd. On Windows, make sure Herd's PHP is first in your `PATH`. You can check which binary is active with:
+
+```bash
+where php   # Windows
+which php   # macOS/Linux
+```
+
+On macOS with Herd, run `herd php` instead of `php` if the path isn't updated, or follow the [Herd path setup docs](https://herd.laravel.com/docs).
+
+---
+
+**`Permission denied` writing to storage**
+
+```bash
+chmod -R 775 storage bootstrap/cache
+```
+
+If you're on Windows and using Herd, restart Herd — it occasionally loses write access after a sleep/wake cycle.
+
+---
+
+**Images not loading / showing broken on first visit**
+
+Character images are proxied and cached locally on first request. If the API is rate limited at the point a new image is first fetched, it will 502. Refresh the page — the next request will retry. Once an image is cached it is served from disk indefinitely.
+
+---
+
+**`php artisan key:generate` says key already set**
+
+That's fine — the app key is already in your `.env`. You only need to run it once after copying `.env.example`.
+
+---
+
+**Port 8000 already in use**
+
+Run the server on a different port:
+
+```bash
+php artisan serve --port=8080
+```
+
+---
+
+**Stale filter options in dropdowns**
+
+Filter options (character species/gender/status, location type/dimension) are cached for 24 hours. To force a refresh:
+
+```bash
+php artisan cache:clear
+```
+
+---
+
+## Development Notes
+
+### Framework — Laravel
+
+Laravel was chosen for a PHP assessment focused on MVC, OOP, and API integration. The codebase is clean and easy to follow with lots of different frontend options.
+
+A few things made it more suited:
+
+- The built-in HTTP client (a thin wrapper around Guzzle) handles API calls cleanly
+- Laravel's cache layer is straightforward to drop in front of API calls, which solves the rate limiting problem
+- Routing, validation, and error handling are all built in and easy to use
+
+It's also a modern framework I have experience in.
+
+---
+
+### Templating — Blade
+
+Blade is Laravel's native templating engine. It compiles down to plain PHP, which keeps things fast, and the template inheritance model (`@extends`, `@section`, `@yield`) makes it straightforward to build a consistent layout without repeating yourself across views.
+
+I would normally use React or Vue for the frontend but Blade fits the task better.
+
+---
+
+### Image Loading — Proxy & Cache
+
+Character images are served from `rickandmortyapi.com`. On the listing page that means up to 20 simultaneous image requests going to the same domain as the API calls, which quickly triggers rate limiting and causes images to fail.
+
+To fix this, images are proxied through a Laravel route (`/images/character/{id}`). On first request the controller fetches the image from the API and writes it to local storage. Every request after that is served straight from disk — the API is never touched again for that image. A one-year `Cache-Control` header is also sent so the browser caches it client-side too.
+
+The visual side of this is handled with a CSS shimmer skeleton while the image loads and a CSS opacity fade-in on load. The transition uses an inline `style="opacity:0"` rather than a Tailwind class because the class-removal approach can happen in the same browser paint cycle as the element appearing, leaving nothing to transition from. Inline style is parsed before the image loads, so the starting value is always set correctly.
+
+#### Production consideration — S3 + CloudFront
+
+Local storage works for a single-server test environment but breaks in production because multiple app servers each build their own independent cache and there is no CDN edge caching.
+
+Because `ImageController` already uses Laravel's `Storage` facade (`Storage::exists`, `Storage::put`, `Storage::get`), switching to S3 is a config change rather than a code change:
+
+```env
+FILESYSTEM_DISK=s3
+AWS_BUCKET=your-bucket
+AWS_DEFAULT_REGION=eu-west-1
+```
