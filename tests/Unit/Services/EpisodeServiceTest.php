@@ -2,18 +2,19 @@
 
 namespace Tests\Unit\Services;
 
-use App\Services\RickAndMortyService;
+use App\Exceptions\ApiConnectionException;
+use App\Services\EpisodeService;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
 class EpisodeServiceTest extends TestCase
 {
-    private RickAndMortyService $service;
+    private EpisodeService $service;
 
     protected function setUp(): void
     {
         parent::setUp();
-        $this->service = app(RickAndMortyService::class);
+        $this->service = app(EpisodeService::class);
     }
 
     // --- getEpisodes ---
@@ -42,11 +43,19 @@ class EpisodeServiceTest extends TestCase
         );
     }
 
-    public function test_get_episodes_returns_empty_array_on_api_error(): void
+    public function test_get_episodes_throws_on_api_error(): void
     {
         Http::fake(['*/episode*' => Http::response([], 500)]);
 
-        $result = $this->service->getEpisodes();
+        $this->expectException(ApiConnectionException::class);
+        $this->service->getEpisodes();
+    }
+
+    public function test_get_episodes_returns_empty_on_no_results(): void
+    {
+        Http::fake(['*/episode*' => Http::response(['error' => 'There is nothing here'], 404)]);
+
+        $result = $this->service->getEpisodes(['name' => 'zzznomatch']);
 
         $this->assertEmpty($result);
     }
@@ -91,6 +100,57 @@ class EpisodeServiceTest extends TestCase
         $this->service->getEpisode(1);
 
         Http::assertSentCount(1);
+    }
+
+    // --- getMultipleEpisodes ---
+
+    public function test_get_multiple_episodes_returns_array_for_multiple_ids(): void
+    {
+        Http::fake([
+            '*/episode/1,2,3' => Http::response([
+                ['id' => 1, 'name' => 'Pilot', 'episode' => 'S01E01'],
+                ['id' => 2, 'name' => 'Lawnmower Dog', 'episode' => 'S01E02'],
+                ['id' => 3, 'name' => 'Anatomy Park', 'episode' => 'S01E03'],
+            ]),
+        ]);
+
+        $result = $this->service->getMultipleEpisodes([1, 2, 3]);
+
+        $this->assertCount(3, $result);
+        $this->assertEquals('Pilot', $result[0]['name']);
+    }
+
+    public function test_get_multiple_episodes_wraps_single_result_in_array(): void
+    {
+        Http::fake([
+            '*/episode/1' => Http::response(['id' => 1, 'name' => 'Pilot', 'episode' => 'S01E01']),
+        ]);
+
+        $result = $this->service->getMultipleEpisodes([1]);
+
+        $this->assertIsArray($result);
+        $this->assertCount(1, $result);
+        $this->assertEquals('Pilot', $result[0]['name']);
+    }
+
+    public function test_get_multiple_episodes_returns_empty_array_for_no_ids(): void
+    {
+        $result = $this->service->getMultipleEpisodes([]);
+
+        $this->assertEmpty($result);
+        Http::assertNothingSent();
+    }
+
+    // --- error handling ---
+
+    public function test_throws_api_connection_exception_on_connection_failure(): void
+    {
+        Http::fake([
+            '*/episode*' => fn () => throw new \Illuminate\Http\Client\ConnectionException('Connection refused'),
+        ]);
+
+        $this->expectException(ApiConnectionException::class);
+        $this->service->getEpisodes();
     }
 
     // --- fixtures ---

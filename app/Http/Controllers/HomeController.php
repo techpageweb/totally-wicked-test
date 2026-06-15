@@ -4,7 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Exceptions\ApiConnectionException;
 use App\Exceptions\ApiRateLimitException;
-use App\Services\RickAndMortyService;
+use App\Services\StatsService;
 use Illuminate\View\View;
 
 /**
@@ -13,9 +13,9 @@ use Illuminate\View\View;
 class HomeController extends Controller
 {
     /**
-     * @param  RickAndMortyService  $api  Injected API service.
+     * @param  StatsService  $stats  Injected stats service.
      */
-    public function __construct(private RickAndMortyService $api) {}
+    public function __construct(private StatsService $stats) {}
 
     /**
      * Display the home page with live character, episode, and location counts.
@@ -25,7 +25,7 @@ class HomeController extends Controller
     public function index(): View
     {
         try {
-            $stats = $this->api->getStats();
+            $stats = $this->stats->getStats();
         } catch (ApiRateLimitException|ApiConnectionException) {
             $stats = ['characters' => null, 'episodes' => null, 'locations' => null];
         }

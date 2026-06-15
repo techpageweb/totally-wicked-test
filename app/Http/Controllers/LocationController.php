@@ -5,7 +5,8 @@ namespace App\Http\Controllers;
 use App\Exceptions\ApiConnectionException;
 use App\Exceptions\ApiRateLimitException;
 use App\Http\Requests\SearchLocationsRequest;
-use App\Services\RickAndMortyService;
+use App\Services\CharacterService;
+use App\Services\LocationService;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 
@@ -15,9 +16,13 @@ use Illuminate\View\View;
 class LocationController extends Controller
 {
     /**
-     * @param  RickAndMortyService  $api  Injected API service.
+     * @param  LocationService   $locations   Injected location API service.
+     * @param  CharacterService  $characters  Injected character API service (for location detail page).
      */
-    public function __construct(private RickAndMortyService $api) {}
+    public function __construct(
+        private LocationService $locations,
+        private CharacterService $characters,
+    ) {}
 
     /**
      * Display a paginated, filterable list of locations.
@@ -38,7 +43,7 @@ class LocationController extends Controller
         $error = null;
 
         try {
-            $data = $this->api->getLocations(array_filter([
+            $data = $this->locations->getLocations(array_filter([
                 'page'      => $currentPage,
                 'name'      => $filters['search'],
                 'type'      => $filters['type'],
@@ -47,7 +52,7 @@ class LocationController extends Controller
 
             $locations     = $data['results'] ?? [];
             $info          = $data['info'] ?? [];
-            $filterOptions = $this->api->getLocationFilterOptions();
+            $filterOptions = $this->locations->getLocationFilterOptions();
         } catch (ApiRateLimitException) {
             $locations     = [];
             $info          = [];
@@ -86,7 +91,7 @@ class LocationController extends Controller
     public function show(int $id, Request $request): View
     {
         try {
-            $location = $this->api->getLocation($id);
+            $location = $this->locations->getLocation($id);
 
             if (empty($location)) {
                 abort(404);
@@ -98,7 +103,7 @@ class LocationController extends Controller
             $totalPages  = max(1, (int) ceil(count($allIds) / $perPage));
             $currentPage = min($currentPage, $totalPages);
             $pageIds     = array_slice($allIds, ($currentPage - 1) * $perPage, $perPage);
-            $residents   = $this->api->getMultipleCharacters($pageIds);
+            $residents   = $this->characters->getMultipleCharacters($pageIds);
         } catch (ApiRateLimitException) {
             abort(503, 'The API rate limit has been reached. Please try again in a moment.');
         } catch (ApiConnectionException) {

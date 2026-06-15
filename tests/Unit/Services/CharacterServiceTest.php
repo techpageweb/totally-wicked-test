@@ -2,18 +2,19 @@
 
 namespace Tests\Unit\Services;
 
-use App\Services\RickAndMortyService;
+use App\Exceptions\ApiConnectionException;
+use App\Services\CharacterService;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
 class CharacterServiceTest extends TestCase
 {
-    private RickAndMortyService $service;
+    private CharacterService $service;
 
     protected function setUp(): void
     {
         parent::setUp();
-        $this->service = app(RickAndMortyService::class);
+        $this->service = app(CharacterService::class);
     }
 
     // --- getCharacters ---
@@ -42,11 +43,19 @@ class CharacterServiceTest extends TestCase
         );
     }
 
-    public function test_get_characters_returns_empty_array_on_api_error(): void
+    public function test_get_characters_throws_on_api_error(): void
     {
         Http::fake(['*/character*' => Http::response([], 500)]);
 
-        $result = $this->service->getCharacters();
+        $this->expectException(ApiConnectionException::class);
+        $this->service->getCharacters();
+    }
+
+    public function test_get_characters_returns_empty_on_no_results(): void
+    {
+        Http::fake(['*/character*' => Http::response(['error' => 'There is nothing here'], 404)]);
+
+        $result = $this->service->getCharacters(['name' => 'zzznomatch']);
 
         $this->assertEmpty($result);
     }
@@ -93,40 +102,39 @@ class CharacterServiceTest extends TestCase
         Http::assertSentCount(1);
     }
 
-    // --- getMultipleEpisodes ---
+    // --- getMultipleCharacters ---
 
-    public function test_get_multiple_episodes_returns_array_for_multiple_ids(): void
+    public function test_get_multiple_characters_returns_array_for_multiple_ids(): void
     {
         Http::fake([
-            '*/episode/1,2,3' => Http::response([
-                ['id' => 1, 'name' => 'Pilot', 'episode' => 'S01E01'],
-                ['id' => 2, 'name' => 'Lawnmower Dog', 'episode' => 'S01E02'],
-                ['id' => 3, 'name' => 'Anatomy Park', 'episode' => 'S01E03'],
+            '*/character/1,2' => Http::response([
+                $this->singleCharacterResponse(),
+                array_merge($this->singleCharacterResponse(), ['id' => 2, 'name' => 'Morty Smith']),
             ]),
         ]);
 
-        $result = $this->service->getMultipleEpisodes([1, 2, 3]);
+        $result = $this->service->getMultipleCharacters([1, 2]);
 
-        $this->assertCount(3, $result);
-        $this->assertEquals('Pilot', $result[0]['name']);
+        $this->assertCount(2, $result);
+        $this->assertEquals('Rick Sanchez', $result[0]['name']);
     }
 
-    public function test_get_multiple_episodes_wraps_single_result_in_array(): void
+    public function test_get_multiple_characters_wraps_single_result_in_array(): void
     {
         Http::fake([
-            '*/episode/1' => Http::response(['id' => 1, 'name' => 'Pilot', 'episode' => 'S01E01']),
+            '*/character/1' => Http::response($this->singleCharacterResponse()),
         ]);
 
-        $result = $this->service->getMultipleEpisodes([1]);
+        $result = $this->service->getMultipleCharacters([1]);
 
         $this->assertIsArray($result);
         $this->assertCount(1, $result);
-        $this->assertEquals('Pilot', $result[0]['name']);
+        $this->assertEquals('Rick Sanchez', $result[0]['name']);
     }
 
-    public function test_get_multiple_episodes_returns_empty_array_for_no_ids(): void
+    public function test_get_multiple_characters_returns_empty_array_for_no_ids(): void
     {
-        $result = $this->service->getMultipleEpisodes([]);
+        $result = $this->service->getMultipleCharacters([]);
 
         $this->assertEmpty($result);
         Http::assertNothingSent();
@@ -134,15 +142,14 @@ class CharacterServiceTest extends TestCase
 
     // --- error handling ---
 
-    public function test_returns_empty_array_on_connection_exception(): void
+    public function test_throws_api_connection_exception_on_connection_failure(): void
     {
         Http::fake([
             '*/character*' => fn () => throw new \Illuminate\Http\Client\ConnectionException('Connection refused'),
         ]);
 
-        $result = $this->service->getCharacters();
-
-        $this->assertEmpty($result);
+        $this->expectException(ApiConnectionException::class);
+        $this->service->getCharacters();
     }
 
     // --- fixtures ---

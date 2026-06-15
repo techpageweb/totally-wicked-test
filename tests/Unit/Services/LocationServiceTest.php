@@ -2,18 +2,19 @@
 
 namespace Tests\Unit\Services;
 
-use App\Services\RickAndMortyService;
+use App\Exceptions\ApiConnectionException;
+use App\Services\LocationService;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
 class LocationServiceTest extends TestCase
 {
-    private RickAndMortyService $service;
+    private LocationService $service;
 
     protected function setUp(): void
     {
         parent::setUp();
-        $this->service = app(RickAndMortyService::class);
+        $this->service = app(LocationService::class);
     }
 
     // --- getLocations ---
@@ -43,11 +44,19 @@ class LocationServiceTest extends TestCase
         );
     }
 
-    public function test_get_locations_returns_empty_array_on_api_error(): void
+    public function test_get_locations_throws_on_api_error(): void
     {
         Http::fake(['*/location*' => Http::response([], 500)]);
 
-        $result = $this->service->getLocations();
+        $this->expectException(ApiConnectionException::class);
+        $this->service->getLocations();
+    }
+
+    public function test_get_locations_returns_empty_on_no_results(): void
+    {
+        Http::fake(['*/location*' => Http::response(['error' => 'There is nothing here'], 404)]);
+
+        $result = $this->service->getLocations(['name' => 'zzznomatch']);
 
         $this->assertEmpty($result);
     }
@@ -92,6 +101,18 @@ class LocationServiceTest extends TestCase
         $this->service->getLocation(1);
 
         Http::assertSentCount(1);
+    }
+
+    // --- error handling ---
+
+    public function test_throws_api_connection_exception_on_connection_failure(): void
+    {
+        Http::fake([
+            '*/location*' => fn () => throw new \Illuminate\Http\Client\ConnectionException('Connection refused'),
+        ]);
+
+        $this->expectException(ApiConnectionException::class);
+        $this->service->getLocations();
     }
 
     // --- fixtures ---
