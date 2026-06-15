@@ -18,6 +18,22 @@ php artisan serve
 
 The app runs on SQLite by default — no database setup required.
 
+## Running Tests
+
+```bash
+# Run all tests
+php artisan test
+
+# Run with descriptive test names
+php vendor/phpunit/phpunit/phpunit --testdox
+
+# Run only unit tests
+php artisan test --testsuite=Unit
+
+# Run a specific file
+php artisan test tests/Unit/Services/RickAndMortyServiceTest.php
+```
+
 ---
 
 ## Framework — Laravel
