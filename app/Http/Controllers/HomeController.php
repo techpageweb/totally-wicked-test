@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Exceptions\ApiConnectionException;
 use App\Exceptions\ApiRateLimitException;
 use App\Services\RickAndMortyService;
 use Illuminate\View\View;
@@ -25,7 +26,7 @@ class HomeController extends Controller
     {
         try {
             $stats = $this->api->getStats();
-        } catch (ApiRateLimitException) {
+        } catch (ApiRateLimitException|ApiConnectionException) {
             $stats = ['characters' => null, 'episodes' => null, 'locations' => null];
         }
 
