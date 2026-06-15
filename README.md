@@ -226,3 +226,6 @@ FILESYSTEM_DISK=s3
 AWS_BUCKET=your-bucket
 AWS_DEFAULT_REGION=eu-west-1
 ```
+
+## AI Disclosure
+AI was used to generate comments for controllers, create unit testing for the API and code review and quality check the code. AI was used to split the service PHP into separate components after I created the Abstract API service - this was to make the services more readable and standard.
