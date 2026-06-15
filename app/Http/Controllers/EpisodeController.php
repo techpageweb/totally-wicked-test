@@ -5,7 +5,8 @@ namespace App\Http\Controllers;
 use App\Exceptions\ApiConnectionException;
 use App\Exceptions\ApiRateLimitException;
 use App\Http\Requests\SearchEpisodesRequest;
-use App\Services\RickAndMortyService;
+use App\Services\CharacterService;
+use App\Services\EpisodeService;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 
@@ -15,9 +16,13 @@ use Illuminate\View\View;
 class EpisodeController extends Controller
 {
     /**
-     * @param  RickAndMortyService  $api  Injected API service.
+     * @param  EpisodeService    $episodes    Injected episode API service.
+     * @param  CharacterService  $characters  Injected character API service (for episode detail page).
      */
-    public function __construct(private RickAndMortyService $api) {}
+    public function __construct(
+        private EpisodeService $episodes,
+        private CharacterService $characters,
+    ) {}
 
     /**
      * Display a paginated, filterable list of episodes.
@@ -37,7 +42,7 @@ class EpisodeController extends Controller
         $error = null;
 
         try {
-            $data = $this->api->getEpisodes(array_filter([
+            $data = $this->episodes->getEpisodes(array_filter([
                 'page'    => $currentPage,
                 'name'    => $filters['search'],
                 'episode' => $filters['episode'],
@@ -80,7 +85,7 @@ class EpisodeController extends Controller
     public function show(int $id, Request $request): View
     {
         try {
-            $episode = $this->api->getEpisode($id);
+            $episode = $this->episodes->getEpisode($id);
 
             if (empty($episode)) {
                 abort(404);
@@ -92,7 +97,7 @@ class EpisodeController extends Controller
             $totalPages  = max(1, (int) ceil(count($allIds) / $perPage));
             $currentPage = min($currentPage, $totalPages);
             $pageIds     = array_slice($allIds, ($currentPage - 1) * $perPage, $perPage);
-            $characters  = $this->api->getMultipleCharacters($pageIds);
+            $characters  = $this->characters->getMultipleCharacters($pageIds);
         } catch (ApiRateLimitException) {
             abort(503, 'The API rate limit has been reached. Please try again in a moment.');
         } catch (ApiConnectionException) {

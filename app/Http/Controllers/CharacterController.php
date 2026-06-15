@@ -5,7 +5,8 @@ namespace App\Http\Controllers;
 use App\Exceptions\ApiConnectionException;
 use App\Exceptions\ApiRateLimitException;
 use App\Http\Requests\SearchCharactersRequest;
-use App\Services\RickAndMortyService;
+use App\Services\CharacterService;
+use App\Services\EpisodeService;
 use Illuminate\View\View;
 
 /**
@@ -14,9 +15,13 @@ use Illuminate\View\View;
 class CharacterController extends Controller
 {
     /**
-     * @param  RickAndMortyService  $api  Injected API service.
+     * @param  CharacterService  $characters  Injected character API service.
+     * @param  EpisodeService    $episodes    Injected episode API service (for character detail page).
      */
-    public function __construct(private RickAndMortyService $api) {}
+    public function __construct(
+        private CharacterService $characters,
+        private EpisodeService $episodes,
+    ) {}
 
     /**
      * Display a paginated, filterable list of characters.
@@ -38,7 +43,7 @@ class CharacterController extends Controller
         $error = null;
 
         try {
-            $data = $this->api->getCharacters(array_filter([
+            $data = $this->characters->getCharacters(array_filter([
                 'page'    => $currentPage,
                 'name'    => $filters['search'],
                 'status'  => $filters['status'],
@@ -48,7 +53,7 @@ class CharacterController extends Controller
 
             $characters    = $data['results'] ?? [];
             $info          = $data['info'] ?? [];
-            $filterOptions = $this->api->getCharacterFilterOptions();
+            $filterOptions = $this->characters->getCharacterFilterOptions();
         } catch (ApiRateLimitException) {
             $characters    = [];
             $info          = [];
@@ -86,14 +91,14 @@ class CharacterController extends Controller
     public function show(int $id): View
     {
         try {
-            $character = $this->api->getCharacter($id);
+            $character = $this->characters->getCharacter($id);
 
             if (empty($character)) {
                 abort(404);
             }
 
             $episodeIds = array_map(fn ($url) => (int) basename($url), $character['episode'] ?? []);
-            $episodes   = $this->api->getMultipleEpisodes($episodeIds);
+            $episodes   = $this->episodes->getMultipleEpisodes($episodeIds);
         } catch (ApiRateLimitException) {
             abort(503, 'The API rate limit has been reached. Please try again in a moment.');
         } catch (ApiConnectionException) {
